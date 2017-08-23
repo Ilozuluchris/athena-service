@@ -24,6 +24,7 @@ TX = 15
 BLINK = 0.05
 RUN = True
 SIGNATURE = "D457GHFD347T"
+PASSPORT_PATH = "/var/www/html/application/passports/"
 
 if IN_PI:
     API = "http://127.0.0.1/index.php/AthenaAPI/"
@@ -481,7 +482,7 @@ def client_thread(connection, ip, port):
                     connection.sendall(response)
                     time.sleep(0.2)
                     print("Preparing to write passport file...")
-                    f = open(payload['data'] + ".jpg", 'wb')
+                    f = open(PASSPORT_PATH + payload['data'], 'wb')
                     print("Receiving Passport...")
                     binaries = connection.recv(1024)
                     while binaries:
@@ -494,7 +495,7 @@ def client_thread(connection, ip, port):
                     print("Closing connection with {0}:{1}".format(ip, port))
                     sys.exit()
                 elif "request" in payload['type']:
-                    f = open(payload['data'], "rb")
+                    f = open(PASSPORT_PATH + payload['data'], "rb")
                     print("Sending Passport...")
                     binaries = f.read(1024)
                     while binaries:
