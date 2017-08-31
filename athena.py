@@ -459,6 +459,27 @@ def client_thread(connection, ip, port):
                             print("Improper Connection Status")
                             print("Closing connection with {0}:{1}".format(ip, port))
                             sys.exit()
+                    elif "download-preferences" in payload['type']:
+                        preferences = ci_action("getPreferences")
+                        response = {"mode": "sync", "type": "dp-response", "conn-stat": 0, "signature": SIGNATURE,
+                                    "table": json.loads(preferences), "errors": 0, "error-codes": [], "key": "",
+                                    "uid": payload['uid']}
+                        response = json.dumps(response)
+                        print("Responding with {0} ...".format(response))
+                        blink_tx()
+                        connection.sendall(response)
+                        if 0 == payload['conn-stat']:
+                            print("Synchronization Complete.")
+                            print("Closing connection with {0}:{1}".format(ip, port))
+                            sys.exit()
+                        if 1 == payload['conn-stat']:
+                            print("Continuing Connection")
+                            used = True
+                            continue
+                        else:
+                            print("Improper Connection Status")
+                            print("Closing connection with {0}:{1}".format(ip, port))
+                            sys.exit()
                 else:
                     print ("Error 0x010: Security ID Mismatch")
                     errors = {"0": "0x010"}
