@@ -277,6 +277,205 @@ def passport_process(payload, connection, ip, port):
             sys.exit()
 
 
+def sync_m_process(payload, connection):
+    print("Finger Module Connected and Requesting Synchronization")
+    blink_rx()
+    if "1" in ci_action("verifyModule/{0}".format(payload['fpmid'])):
+        fpmid = payload['fpmid']
+        if "request" in payload['dataType'] and "necessities" in payload['data']:
+            module_pack = json.loads(ci_action("getModulePack"))
+            students = module_pack["students"]
+            staffs = module_pack['staffs']
+            print("Beginning Synchronization")
+            for record in students:  # Sending Students...
+                packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
+                          "dataType": "student", "data": {"sid": record['id'], "fpTemplate": record['hash'],
+                                                          "fpid": record['mid']}}
+                packet = json.dumps(packet)
+                print ("Sending Module Packet: {0}".format(packet))
+                blink_tx()
+                connection.sendall(packet)
+                ack = False
+                while not ack:
+                    try:
+                        data = connection.recv(1024)
+                        data = json.loads(data)
+                        ack = True
+                        blink_rx()
+                        if "syncM" in data['mode'] and SIGNATURE in data['signature']:
+                            if fpmid in data['fpmid']:
+                                if "ack" in data['dataType'] and data['data'] == 1:
+                                    break
+                                else:
+                                    print("Module returned a negative acknowledge packet")
+                                    connection.close()
+                                    sys.exit()
+                            else:
+                                print ("Invalid Module for session")
+                        else:
+                            print ("Protocol corrupted in session")
+                    except ValueError:
+                        ack = False
+            for record in staffs:
+                packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
+                          "dataType": "staff", "data": {"sid": record['id'], "fpTemplate": record['hash'],
+                                                        "fpid": record['mid']}}
+                packet = json.dumps(packet)
+                print ("Sending Module Packet: {0}".format(packet))
+                blink_tx()
+                connection.sendall(packet)
+                ack = False
+                while not ack:
+                    try:
+                        data = connection.recv(1024)
+                        data = json.loads(data)
+                        ack = True
+                        blink_rx()
+                        if "syncM" in data['mode'] and SIGNATURE in data['signature']:
+                            if fpmid in data['fpmid']:
+                                if "ack" in data['dataType'] and data['data'] == 1:
+                                    break
+                                else:
+                                    print("Module returned a negative acknowledge packet")
+                                    connection.close()
+                                    sys.exit()
+                            else:
+                                print ("Invalid Module for session")
+                        else:
+                            print ("Protocol corrupted in session")
+                    except ValueError:
+                        ack = False
+            for record in staffs:  # Sending Staffs...
+                packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
+                          "dataType": "securityId", "data": record['security_id']}
+                packet = json.dumps(packet)
+                print ("Sending Module Packet: {0}".format(packet))
+                blink_tx()
+                connection.sendall(packet)
+                ack = False
+                while not ack:
+                    try:
+                        data = connection.recv(1024)
+                        data = json.loads(data)
+                        ack = True
+                        blink_rx()
+                        if "syncM" in data['mode'] and SIGNATURE in data['signature']:
+                            if fpmid in data['fpmid']:
+                                if "ack" in data['dataType'] and data['data'] == 1:
+                                    break
+                                else:
+                                    print("Module returned a negative acknowledge packet")
+                                    connection.close()
+                                    sys.exit()
+                            else:
+                                print ("Invalid Module for session")
+                        else:
+                            print ("Protocol corrupted in session")
+                    except ValueError:
+                        ack = False
+            module_name = ci_action("getModuleName/{0}".format(fpmid))  # Sending Module Name...
+            packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
+                      "dataType": "moduleName", "data": module_name}
+            packet = json.dumps(packet)
+            print ("Sending Module Packet: {0}".format(packet))
+            connection.sendall(packet)
+            blink_tx()
+            ack = False
+            while not ack:
+                try:
+                    data = connection.recv(1024)
+                    data = json.loads(data)
+                    ack = True
+                    blink_rx()
+                    if "syncM" in data['mode'] and SIGNATURE in data['signature']:
+                        if fpmid in data['fpmid']:
+                            if "ack" in data['dataType'] and data['data'] == 1:
+                                break
+                            else:
+                                print("Module returned a negative acknowledge packet")
+                                connection.close()
+                                sys.exit()
+                        else:
+                            print ("Invalid Module for session")
+                    else:
+                        print ("Protocol corrupted in session")
+                except ValueError:
+                    ack = False
+            lecture_hall = ci_action("getLectureHallForModule/{0}".format(fpmid))  # Sending Lecture Hall...
+            packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
+                      "dataType": "lectureHall", "data": lecture_hall}
+            packet = json.dumps(packet)
+            print ("Sending Module Packet: {0}".format(packet))
+            connection.sendall(packet)
+            blink_tx()
+            ack = False
+            while not ack:
+                try:
+                    data = connection.recv(1024)
+                    data = json.loads(data)
+                    ack = True
+                    blink_rx()
+                    if "syncM" in data['mode'] and SIGNATURE in data['signature']:
+                        if fpmid in data['fpmid']:
+                            if "ack" in data['dataType'] and data['data'] == 1:
+                                break
+                            else:
+                                print("Module returned a negative acknowledge packet")
+                                connection.close()
+                                sys.exit()
+                        else:
+                            print ("Invalid Module for session")
+                    else:
+                        print ("Protocol corrupted in session")
+                except ValueError:
+                    ack = False
+            packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
+                      "dataType": "request", "data": "stats"}  # Requesting Stats...
+            packet = json.dumps(packet)
+            print ("Sending Module Packet: {0}".format(packet))
+            connection.sendall(packet)
+            blink_tx()
+            ack = False
+            while not ack:
+                try:
+                    data = connection.recv(1024)
+                    data = json.loads(data)
+                    ack = True
+                    blink_rx()
+                    if "syncM" in data['mode'] and SIGNATURE in data['signature']:
+                        if fpmid in data['fpmid']:
+                            if "mStats" in data['dataType']:
+                                if "1" in ci_action("logModuleStats/{0}/{1}/{2}".format(fpmid, data['data']['nUsed'],
+                                                                                        data['data']['battery'])):
+                                    packet = {"keepAlive": 0, "mode": "syncM", "fpmid": fpmid,
+                                              "dataType": "X",
+                                              "data": "X"}
+                                    packet = json.dumps(packet)
+                                    print ("Sending Module Packet: {0}".format(packet))
+                                    connection.sendall(packet)
+                                    blink_tx()
+                                    print("Module Sync Ended")
+                                    print("Closing Connection")
+                                    connection.close()
+                                    sys.exit()
+                                else:
+                                    print("Error in Logging module stats for {0}".format(fpmid))
+                                    sys.exit()
+                            else:
+                                print("Module returned a negative acknowledge packet")
+                                connection.close()
+                                sys.exit()
+                        else:
+                            print ("Invalid Module for session")
+                    else:
+                        print ("Protocol corrupted in session")
+                except ValueError:
+                    ack = False
+    else:
+        print ("Unknown Module")
+        print ("Closing Connection")
+
+
 def client_thread(connection, ip, port):
     buff = ''
     used = False
@@ -461,236 +660,40 @@ def client_thread(connection, ip, port):
         if SIGNATURE in payload['signature']:
             blink_rx()
             print("Signature Match!, Processing Request...")
-            if "1" in ci_action("verifyKey/" + payload['key'] + "/" + str(payload['uid'])):
-                if "syncA" in payload['mode']:
-                    blink_rx()
-                    print ("SyncA Mode Started...")
-                    connection.sendall(sync_a_process(payload))  # Process Sync A Protocol
-                elif "passport" in payload['mode']:
-                    passport_process(payload, connection, ip, port)
-                if 0 == payload['conn-stat']:
-                    print("Closing connection with {0}:{1}".format(ip, port))
-                    sys.exit()
-                if 1 == payload['conn-stat']:
-                    print("Continuing Connection")
-                    used = True
-                    continue
+            if 'key' in payload:  # Protocol Modes for Android Devices
+                if "1" in ci_action("verifyKey/" + payload['key'] + "/" + str(payload['uid'])):  # Verify Signature for Android Requests here.
+                    if "syncA" in payload['mode']:
+                        blink_rx()
+                        print ("SyncA Mode Started...")
+                        connection.sendall(sync_a_process(payload))  # Process Sync A Protocol.
+                    elif "passport" in payload['mode']:
+                        passport_process(payload, connection, ip, port)  # Process Passport Protocol.
+                    if 0 == payload['conn-stat']:
+                        print("Closing connection with {0}:{1}".format(ip, port))
+                        sys.exit()
+                    if 1 == payload['conn-stat']:
+                        print("Continuing Connection")
+                        used = True
+                        continue
+                    else:
+                        print("Improper Connection Status")
+                        print("Closing connection with {0}:{1}".format(ip, port))
+                        sys.exit()
                 else:
-                    print("Improper Connection Status")
+                    print ("Error 0x010: Security ID Mismatch")
+                    errors = {"0": "0x010"}
+                    response = {"mode": "sync", "conn-stat": 0, "type": payload['type'][0:1] + "-response",
+                                "signature": SIGNATURE, "table": "", "version": 0, "key": "", "data": "!ACK", "uid": 0,
+                                "errors": len(errors), "error-codes": errors}
+                    response = json.dumps(response)
+                    print("Responding with {0} ...".format(response))
+                    blink_tx()
+                    connection.sendall(response)
                     print("Closing connection with {0}:{1}".format(ip, port))
                     sys.exit()
             else:
-                print ("Error 0x010: Security ID Mismatch")
-                errors = {"0": "0x010"}
-                response = {"mode": "sync", "conn-stat": 0, "type": payload['type'][0:1] + "-response",
-                            "signature": SIGNATURE, "table": "", "version": 0, "key": "", "data": "!ACK", "uid": 0,
-                            "errors": len(errors), "error-codes": errors}
-                response = json.dumps(response)
-                print("Responding with {0} ...".format(response))
-                blink_tx()
-                connection.sendall(response)
-                print("Closing connection with {0}:{1}".format(ip, port))
-                sys.exit()
-            if "syncM" in payload['mode']:  # syncM Protocol
-                print("Finger Module Connected and Requesting Synchronization")
-                blink_rx()
-                if "1" in ci_action("verifyModule/{0}".format(payload['fpmid'])):
-                    fpmid = payload['fpmid']
-                    if "request" in payload['dataType'] and "necessities" in payload['data']:
-                        module_pack = json.loads(ci_action("getModulePack"))
-                        students = module_pack["students"]
-                        staffs = module_pack['staffs']
-                        print("Beginning Synchronization")
-                        for record in students:  # Sending Students...
-                            packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
-                                      "dataType": "student", "data": {"sid": record['id'], "fpTemplate": record['hash'],
-                                                                      "fpid": record['mid']}}
-                            packet = json.dumps(packet)
-                            print ("Sending Module Packet: {0}".format(packet))
-                            blink_tx()
-                            connection.sendall(packet)
-                            ack = False
-                            while not ack:
-                                try:
-                                    data = connection.recv(1024)
-                                    data = json.loads(data)
-                                    ack = True
-                                    blink_rx()
-                                    if "syncM" in data['mode'] and SIGNATURE in data['signature']:
-                                        if fpmid in data['fpmid']:
-                                            if "ack" in data['dataType'] and data['data'] == 1:
-                                                break
-                                            else:
-                                                print("Module returned a negative acknowledge packet")
-                                                connection.close()
-                                                sys.exit()
-                                        else:
-                                            print ("Invalid Module for session")
-                                    else:
-                                        print ("Protocol corrupted in session")
-                                except ValueError:
-                                    ack = False
-                        for record in staffs:
-                            packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
-                                      "dataType": "staff", "data": {"sid": record['id'], "fpTemplate": record['hash'],
-                                                                    "fpid": record['mid']}}
-                            packet = json.dumps(packet)
-                            print ("Sending Module Packet: {0}".format(packet))
-                            blink_tx()
-                            connection.sendall(packet)
-                            ack = False
-                            while not ack:
-                                try:
-                                    data = connection.recv(1024)
-                                    data = json.loads(data)
-                                    ack = True
-                                    blink_rx()
-                                    if "syncM" in data['mode'] and SIGNATURE in data['signature']:
-                                        if fpmid in data['fpmid']:
-                                            if "ack" in data['dataType'] and data['data'] == 1:
-                                                break
-                                            else:
-                                                print("Module returned a negative acknowledge packet")
-                                                connection.close()
-                                                sys.exit()
-                                        else:
-                                            print ("Invalid Module for session")
-                                    else:
-                                        print ("Protocol corrupted in session")
-                                except ValueError:
-                                    ack = False
-                        for record in staffs:  # Sending Staffs...
-                            packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
-                                      "dataType": "securityId", "data": record['security_id']}
-                            packet = json.dumps(packet)
-                            print ("Sending Module Packet: {0}".format(packet))
-                            blink_tx()
-                            connection.sendall(packet)
-                            ack = False
-                            while not ack:
-                                try:
-                                    data = connection.recv(1024)
-                                    data = json.loads(data)
-                                    ack = True
-                                    blink_rx()
-                                    if "syncM" in data['mode'] and SIGNATURE in data['signature']:
-                                        if fpmid in data['fpmid']:
-                                            if "ack" in data['dataType'] and data['data'] == 1:
-                                                break
-                                            else:
-                                                print("Module returned a negative acknowledge packet")
-                                                connection.close()
-                                                sys.exit()
-                                        else:
-                                            print ("Invalid Module for session")
-                                    else:
-                                        print ("Protocol corrupted in session")
-                                except ValueError:
-                                    ack = False
-                        module_name = ci_action("getModuleName/{0}".format(fpmid))  # Sending Module Name...
-                        packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
-                                  "dataType": "moduleName", "data": module_name}
-                        packet = json.dumps(packet)
-                        print ("Sending Module Packet: {0}".format(packet))
-                        connection.sendall(packet)
-                        blink_tx()
-                        ack = False
-                        while not ack:
-                            try:
-                                data = connection.recv(1024)
-                                data = json.loads(data)
-                                ack = True
-                                blink_rx()
-                                if "syncM" in data['mode'] and SIGNATURE in data['signature']:
-                                    if fpmid in data['fpmid']:
-                                        if "ack" in data['dataType'] and data['data'] == 1:
-                                            break
-                                        else:
-                                            print("Module returned a negative acknowledge packet")
-                                            connection.close()
-                                            sys.exit()
-                                    else:
-                                        print ("Invalid Module for session")
-                                else:
-                                    print ("Protocol corrupted in session")
-                            except ValueError:
-                                ack = False
-                        lecture_hall = ci_action("getLectureHallForModule/{0}".format(fpmid))  # Sending Lecture Hall...
-                        packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
-                                  "dataType": "lectureHall", "data": lecture_hall}
-                        packet = json.dumps(packet)
-                        print ("Sending Module Packet: {0}".format(packet))
-                        connection.sendall(packet)
-                        blink_tx()
-                        ack = False
-                        while not ack:
-                            try:
-                                data = connection.recv(1024)
-                                data = json.loads(data)
-                                ack = True
-                                blink_rx()
-                                if "syncM" in data['mode'] and SIGNATURE in data['signature']:
-                                    if fpmid in data['fpmid']:
-                                        if "ack" in data['dataType'] and data['data'] == 1:
-                                            break
-                                        else:
-                                            print("Module returned a negative acknowledge packet")
-                                            connection.close()
-                                            sys.exit()
-                                    else:
-                                        print ("Invalid Module for session")
-                                else:
-                                    print ("Protocol corrupted in session")
-                            except ValueError:
-                                ack = False
-                        packet = {"keepAlive": 1, "mode": "syncM", "signature": SIGNATURE, "fpmid": fpmid,
-                                  "dataType": "request", "data": "stats"}  # Requesting Stats...
-                        packet = json.dumps(packet)
-                        print ("Sending Module Packet: {0}".format(packet))
-                        connection.sendall(packet)
-                        blink_tx()
-                        ack = False
-                        while not ack:
-                            try:
-                                data = connection.recv(1024)
-                                data = json.loads(data)
-                                ack = True
-                                blink_rx()
-                                if "syncM" in data['mode'] and SIGNATURE in data['signature']:
-                                    if fpmid in data['fpmid']:
-                                        if "mStats" in data['dataType']:
-                                            if "1" in ci_action("logModuleStats/{0}/{1}/{2}".format(fpmid,
-                                                                                                    data['data'][
-                                                                                                        'nUsed'],
-                                                                                                    data['data'][
-                                                                                                        'battery'])):
-                                                packet = {"keepAlive": 0, "mode": "syncM", "fpmid": fpmid,
-                                                          "dataType": "X",
-                                                          "data": "X"}
-                                                packet = json.dumps(packet)
-                                                print ("Sending Module Packet: {0}".format(packet))
-                                                connection.sendall(packet)
-                                                blink_tx()
-                                                print("Module Sync Ended")
-                                                print("Closing Connection")
-                                                connection.close()
-                                                sys.exit()
-                                            else:
-                                                print("Error in Logging module stats for {0}".format(fpmid))
-                                                sys.exit()
-                                        else:
-                                            print("Module returned a negative acknowledge packet")
-                                            connection.close()
-                                            sys.exit()
-                                    else:
-                                        print ("Invalid Module for session")
-                                else:
-                                    print ("Protocol corrupted in session")
-                            except ValueError:
-                                ack = False
-                else:
-                    print ("Unknown Module")
-                    print ("Closing Connection")
+                if "syncM" in payload['mode']:  # syncM Protocol
+                    sync_m_process(payload, connection)
         else:
             if len(payload['signature']) == 12:
                 print("Unknown Signature")
