@@ -238,6 +238,45 @@ def sync_a_process(payload):  # Processes SyncA Mode Protocol
         return response
 
 
+def passport_process(payload, connection, ip, port):
+    if "passport" in payload['mode']:
+        print("Passport Packet Received. Processing...")
+        blink_rx()
+        if "image" in payload['type']:
+            response = {"mode": "passport", "type": "ack", "signature": SIGNATURE, "data": 1}
+            response = json.dumps(response)
+            print ("Responding with {0}".format(response))
+            blink_tx()
+            connection.sendall(response)
+            time.sleep(0.2)
+            print("Preparing to write passport file...")
+            f = open(PASSPORT_PATH + payload['data'], 'wb')
+            print("Receiving Passport...")
+            binaries = connection.recv(1024)
+            while binaries:
+                blink_rx()
+                f.write(binaries)
+                binaries = connection.recv(1024)
+            f.close()
+            print("Done Receiving Passport")
+            print("Done Receiving Passport")
+            print("Closing connection with {0}:{1}".format(ip, port))
+            sys.exit()
+        elif "request" in payload['type']:
+            f = open(PASSPORT_PATH + payload['data'], "rb")
+            print("Sending Passport...")
+            binaries = f.read(1024)
+            while binaries:
+                blink_tx()
+                connection.sendall(binaries)
+                binaries = f.read(1024)
+            f.close()
+            print("Done Sending Passport")
+            print("Done Receiving Passport")
+            print("Closing connection with {0}:{1}".format(ip, port))
+            sys.exit()
+
+
 def client_thread(connection, ip, port):
     buff = ''
     used = False
@@ -422,70 +461,36 @@ def client_thread(connection, ip, port):
         if SIGNATURE in payload['signature']:
             blink_rx()
             print("Signature Match!, Processing Request...")
-            if "syncA" in payload['mode']:
-                blink_rx()
-                print ("SyncA Mode Started...")
-                if "1" in ci_action("verifyKey/" + payload['key'] + "/" + str(payload['uid'])):
+            if "1" in ci_action("verifyKey/" + payload['key'] + "/" + str(payload['uid'])):
+                if "syncA" in payload['mode']:
+                    blink_rx()
+                    print ("SyncA Mode Started...")
                     connection.sendall(sync_a_process(payload))  # Process Sync A Protocol
-                    if 0 == payload['conn-stat']:
-                        print("Closing connection with {0}:{1}".format(ip, port))
-                        sys.exit()
-                    if 1 == payload['conn-stat']:
-                        print("Continuing Connection")
-                        used = True
-                        continue
-                    else:
-                        print("Improper Connection Status")
-                        print("Closing connection with {0}:{1}".format(ip, port))
-                        sys.exit()
+                elif "passport" in payload['mode']:
+                    passport_process(payload, connection, ip, port)
+                if 0 == payload['conn-stat']:
+                    print("Closing connection with {0}:{1}".format(ip, port))
+                    sys.exit()
+                if 1 == payload['conn-stat']:
+                    print("Continuing Connection")
+                    used = True
+                    continue
                 else:
-                    print ("Error 0x010: Security ID Mismatch")
-                    errors = {"0": "0x010"}
-                    response = {"mode": "sync", "conn-stat": 0, "type": payload['type'][0:1] + "-response",
-                                "signature": SIGNATURE, "table": "", "version": 0, "key": "", "data": "!ACK", "uid": 0,
-                                "errors": len(errors), "error-codes": errors}
-                    response = json.dumps(response)
-                    print("Responding with {0} ...".format(response))
-                    blink_tx()
-                    connection.sendall(response)
+                    print("Improper Connection Status")
                     print("Closing connection with {0}:{1}".format(ip, port))
                     sys.exit()
-            if "passport" in payload['mode']:
-                print("Passport Packet Received. Processing...")
-                blink_rx()
-                if "image" in payload['type']:
-                    response = {"mode": "passport", "type": "ack", "signature": SIGNATURE, "data": 1}
-                    response = json.dumps(response)
-                    print ("Responding with {0}".format(response))
-                    blink_tx()
-                    connection.sendall(response)
-                    time.sleep(0.2)
-                    print("Preparing to write passport file...")
-                    f = open(PASSPORT_PATH + payload['data'], 'wb')
-                    print("Receiving Passport...")
-                    binaries = connection.recv(1024)
-                    while binaries:
-                        blink_rx()
-                        f.write(binaries)
-                        binaries = connection.recv(1024)
-                    f.close()
-                    print("Done Receiving Passport")
-                    print("Done Receiving Passport")
-                    print("Closing connection with {0}:{1}".format(ip, port))
-                    sys.exit()
-                elif "request" in payload['type']:
-                    f = open(PASSPORT_PATH + payload['data'], "rb")
-                    print("Sending Passport...")
-                    binaries = f.read(1024)
-                    while binaries:
-                        blink_tx()
-                        connection.sendall(binaries)
-                        binaries = f.read(1024)
-                    f.close()
-                    print("Done Sending Passport")
-                    print("Done Receiving Passport")
-                    print("Closing connection with {0}:{1}".format(ip, port))
-                    sys.exit()
+            else:
+                print ("Error 0x010: Security ID Mismatch")
+                errors = {"0": "0x010"}
+                response = {"mode": "sync", "conn-stat": 0, "type": payload['type'][0:1] + "-response",
+                            "signature": SIGNATURE, "table": "", "version": 0, "key": "", "data": "!ACK", "uid": 0,
+                            "errors": len(errors), "error-codes": errors}
+                response = json.dumps(response)
+                print("Responding with {0} ...".format(response))
+                blink_tx()
+                connection.sendall(response)
+                print("Closing connection with {0}:{1}".format(ip, port))
+                sys.exit()
             if "syncM" in payload['mode']:  # syncM Protocol
                 print("Finger Module Connected and Requesting Synchronization")
                 blink_rx()
