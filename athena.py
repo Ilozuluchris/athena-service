@@ -14,24 +14,24 @@ except ImportError:
     print("This service is not running on a Raspberry Pi")
     IN_PI = False
 
-HOST = ''                                                   # Refers to Self.
-PORT = 8952                                                 # Athena Service Port.
+HOST = ''  # Refers to Self.
+PORT = 8952  # Athena Service Port.
 
-SERVICE = 11                                                # Service LED Pin.
-DB_WRITE = 12                                               # Database Write LED Pin
-RX = 13                                                     # Data Reception LED Pin
-TX = 15                                                     # Data Transmission Indication LED Pin.
-BLINK = 0.05                                                # Blinking Delay Time.
-RUN = True                                                  # Service Loop Control Variable.
+SERVICE = 11  # Service LED Pin.
+DB_WRITE = 12  # Database Write LED Pin
+RX = 13  # Data Reception LED Pin
+TX = 15  # Data Transmission Indication LED Pin.
+BLINK = 0.05  # Blinking Delay Time.
+RUN = True  # Service Loop Control Variable.
 SIGNATURE = "D457GHFD347T"
-PASSPORT_PATH = "/var/www/html/application/passports/"      # Directory Path for Passport Files.
+PASSPORT_PATH = "/var/www/html/application/passports/"  # Directory Path for Passport Files.
 
 if IN_PI:
-    API = "http://127.0.0.1/index.php/AthenaAPI/"           # CodeIgniter API URL when Running in Raspberry Pi
+    API = "http://127.0.0.1/index.php/AthenaAPI/"  # CodeIgniter API URL when Running in Raspberry Pi
 else:
-    API = "http://127.0.0.1/athena/index.php/AthenaAPI/"    # CodeIgniter API URL when Running in Windows.
+    API = "http://127.0.0.1/athena/index.php/AthenaAPI/"  # CodeIgniter API URL when Running in Windows.
 
-if IN_PI:                                 # Set GPIO Pins appropriately id Running in Raspberry Pi.
+if IN_PI:  # Set GPIO Pins appropriately id Running in Raspberry Pi.
     GPIO.setmode(GPIO.BOARD)
     GPIO.setwarnings(False)
     GPIO.setup(SERVICE, GPIO.OUT)
@@ -40,17 +40,17 @@ if IN_PI:                                 # Set GPIO Pins appropriately id Runni
     GPIO.setup(TX, GPIO.OUT)
 
 
-def turn_on(pin):                         # Function to turn on a pin
+def turn_on(pin):  # Function to turn on a pin
     if IN_PI:
         GPIO.output(pin, GPIO.HIGH)
 
 
-def turn_off(pin):                        # Function to turn off a pin
+def turn_off(pin):  # Function to turn off a pin
     if IN_PI:
         GPIO.output(pin, GPIO.LOW)
 
 
-def init_pins():                          # Function that blinks all LEDs at the start of the service.
+def init_pins():  # Function that blinks all LEDs at the start of the service.
     turn_on(SERVICE)
     time.sleep(BLINK)
     turn_off(SERVICE)
@@ -70,7 +70,7 @@ def init_pins():                          # Function that blinks all LEDs at the
     turn_on(SERVICE)
 
 
-def ci_action(function):                   # Function that performs codeIgniter API calls via URL.
+def ci_action(function):  # Function that performs codeIgniter API calls via URL.
     return urllib2.urlopen(API + function).read()
 
 
@@ -79,7 +79,7 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 print 'Socket Created'
 
 try:
-    s.bind((HOST, PORT))             # Bind to local host on port 8952.
+    s.bind((HOST, PORT))  # Bind to local host on port 8952.
     init_pins()
 except socket.error, msg:
     print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
@@ -122,7 +122,7 @@ def stop_service():
     RUN = False
 
 
-def sync_a_process(payload):   # Processes SyncA Mode Protocol
+def sync_a_process(payload):  # Processes SyncA Mode Protocol
     print ("Processing SyncA Packet...")
     if "download" in payload['type']:
         print("Sending Data...")
@@ -236,7 +236,6 @@ def sync_a_process(payload):   # Processes SyncA Mode Protocol
         print("Responding with {0} ...".format(response))
         blink_tx()
         return response
-
 
 
 def client_thread(connection, ip, port):
@@ -427,7 +426,7 @@ def client_thread(connection, ip, port):
                 blink_rx()
                 print ("SyncA Mode Started...")
                 if "1" in ci_action("verifyKey/" + payload['key'] + "/" + str(payload['uid'])):
-                    connection.sendall(sync_a_process(payload))     #  Process Sync A Protocol
+                    connection.sendall(sync_a_process(payload))  # Process Sync A Protocol
                     if 0 == payload['conn-stat']:
                         print("Closing connection with {0}:{1}".format(ip, port))
                         sys.exit()
