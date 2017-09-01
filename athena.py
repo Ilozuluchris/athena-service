@@ -122,6 +122,123 @@ def stop_service():
     RUN = False
 
 
+def sync_a_process(payload):   # Processes SyncA Mode Protocol
+    print ("Processing SyncA Packet...")
+    if "download" in payload['type']:
+        print("Sending Data...")
+        errors = {}
+        version = int(ci_action("getVersion/" + payload['table']))
+        if version > payload['version']:
+            table_data = ci_action("getTable/" + payload['table'])
+            if "[]" in table_data:
+                is_empty = 1
+            else:
+                is_empty = 0
+            response = {"mode": "sync", "type": "d-response",
+                        "signature": SIGNATURE,
+                        "conn-stat": 1,
+                        "data": json.loads(table_data),
+                        "is_empty": is_empty,
+                        "should_wipe": 1,
+                        "version": version, "errors": len(errors), "error-codes": errors}
+            print("Flagging that table has been downloaded by user.")
+            if "1" not in (ci_action("flagTaken/" + payload['table'] + "/1")):
+                errors[str(len(errors))] = "0x011"
+            response = json.dumps(response)
+            print("Responding with {0}".format(response))
+            blink_tx()
+            return response
+        else:
+            print(version)
+            print(payload['version'])
+            if version == -1:
+                errors[str(len(errors))] = "0x008"
+            elif version < payload['version']:
+                errors[str(len(errors))] = "0x007"
+            response = {"mode": "sync", "type": "d-response",
+                        "signature": SIGNATURE,
+                        "data": {},
+                        "is_empty": 1,
+                        "should_wipe": 0,
+                        "version": version, "errors": len(errors), "error-codes": errors,
+                        "conn-stat": 1, "key": "", "uid": payload['uid']}
+            response = json.dumps(response)
+            print("Responding with {0}".format(response))
+            blink_tx()
+            return response
+    elif "calibrate" in payload['type']:
+        print("Calibrating...")
+        tables = payload['data']
+        success = True
+        fails = []
+        position = 0
+        errors = {}
+        for table in tables:
+            if "1" not in ci_action("calibrateTable/" + table):
+                success = False
+            if success:
+                print("Table: {0} calibrated successfully.".format(table))
+            else:
+                print("Table: {0} not successfully calibrated".format(table))
+                fails.append(position)
+                success = True
+            position += 1
+        if len(fails) > 0:
+            errors[str(len(errors))] = "0x012"
+        response = {"mode": "sync", "conn-stat": 1, "type": "c-response", "signature": SIGNATURE,
+                    "table": fails, "version": 0, "errors": len(errors), "error-codes": errors,
+                    "key": "", "uid": payload['uid']}
+        response = json.dumps(response)
+        print("Responding with {0} ...".format(response))
+        blink_tx()
+        return response
+    elif "download-preferences" in payload['type']:
+        preferences = ci_action("getPreferences")
+        response = {"mode": "sync", "type": "dp-response", "conn-stat": 0, "signature": SIGNATURE,
+                    "table": json.loads(preferences), "errors": 0, "error-codes": [], "key": "",
+                    "uid": payload['uid']}
+        response = json.dumps(response)
+        print("Responding with {0} ...".format(response))
+        blink_tx()
+        return response
+    elif "upload" in payload['type']:
+        print("Getting DSync Commands...")
+        commands = payload['data']
+        success = True
+        fails = []
+        position = 0
+        errors = {}
+        for command in commands:
+            print("Executing Command {0} ...".format(command))
+            blink_db_write()
+            code = ci_action("modifyTable/" + dsync.translate(command.strip()))
+            if "1" not in code:
+                success = False
+            if success:
+                print("Command Executed Successfully")
+            else:
+                if "3" in code:
+                    code = "0x013"
+                elif "2" in code:
+                    code = "0x014"
+                else:
+                    code = "0x15"
+                fails.append([position, code])
+                print("Problem Executing Command")
+                success = True
+            position += 1
+        if len(fails) > 0:
+            errors[str(len(errors))] = "0x009"
+        response = {"mode": "sync", "conn-stat": 1, "type": "u-response", "signature": SIGNATURE,
+                    "table": fails, "version": 0, "key": "", "data": "ACK", "uid": 0,
+                    "errors": len(errors), "error-codes": errors}
+        response = json.dumps(response)
+        print("Responding with {0} ...".format(response))
+        blink_tx()
+        return response
+
+
+
 def client_thread(connection, ip, port):
     buff = ''
     used = False
@@ -308,178 +425,20 @@ def client_thread(connection, ip, port):
             print("Signature Match!, Processing Request...")
             if "syncA" in payload['mode']:
                 blink_rx()
-                print ("Synchronization Mode Started...")
+                print ("SyncA Mode Started...")
                 if "1" in ci_action("verifyKey/" + payload['key'] + "/" + str(payload['uid'])):
-                    if "download" in payload['type']:
-                        print("Sending Data...")
-                        errors = {}
-                        version = int(ci_action("getVersion/" + payload['table']))
-                        if version > payload['version']:
-                            table_data = ci_action("getTable/" + payload['table'])
-                            if "[]" in table_data:
-                                is_empty = 1
-                            else:
-                                is_empty = 0
-                            response = {"mode": "sync", "type": "d-response",
-                                        "signature": SIGNATURE,
-                                        "conn-stat": 1,
-                                        "data": json.loads(table_data),
-                                        "is_empty": is_empty,
-                                        "should_wipe": 1,
-                                        "version": version, "errors": len(errors), "error-codes": errors}
-                            print("Flagging that table has been downloaded by user.")
-                            if "1" not in (ci_action("flagTaken/" + payload['table'] + "/1")):
-                                errors[str(len(errors))] = "0x011"
-                            response = json.dumps(response)
-                            print("Responding with {0}".format(response))
-                            blink_tx()
-                            connection.sendall(response)
-                            if 0 == payload['conn-stat']:
-                                print("Closing connection with {0}:{1}".format(ip, port))
-                                sys.exit()
-                            if 1 == payload['conn-stat']:
-                                print("Continuing Connection")
-                                used = True
-                                continue
-                            else:
-                                print("Improper Connection Status")
-                                print("Closing connection with {0}:{1}".format(ip, port))
-                                sys.exit()
-                        else:
-                            print(version)
-                            print(payload['version'])
-                            if version == -1:
-                                errors[str(len(errors))] = "0x008"
-                            elif version < payload['version']:
-                                errors[str(len(errors))] = "0x007"
-                            response = {"mode": "sync", "type": "d-response",
-                                        "signature": SIGNATURE,
-                                        "data": {},
-                                        "is_empty": 1,
-                                        "should_wipe": 0,
-                                        "version": version, "errors": len(errors), "error-codes": errors,
-                                        "conn-stat": 1, "key": "", "uid": payload['uid']}
-                            response = json.dumps(response)
-                            print("Responding with {0}".format(response))
-                            blink_tx()
-                            connection.sendall(response)
-                            if 0 == payload['conn-stat']:
-                                print("Closing connection with {0}:{1}".format(ip, port))
-                                sys.exit()
-                            if 1 == payload['conn-stat']:
-                                print("Continuing Connection")
-                                used = True
-                                continue
-                            else:
-                                print("Improper Connection Status")
-                                print("Closing connection with {0}:{1}".format(ip, port))
-                                sys.exit()
-                    elif "upload" in payload['type']:
-                        print("Getting Data...")
-                        commands = payload['data']
-                        success = True
-                        fails = []
-                        position = 0
-                        errors = {}
-                        for command in commands:
-                            print("Executing Command {0} ...".format(command))
-                            blink_db_write()
-                            code = ci_action("modifyTable/" + dsync.translate(command.strip()))
-                            if "1" not in code:
-                                success = False
-                            if success:
-                                print("Command Executed Successfully")
-                            else:
-                                if "3" in code:
-                                    code = "0x013"
-                                elif "2" in code:
-                                    code = "0x014"
-                                else:
-                                    code = "0x15"
-                                fails.append([position, code])
-                                print("Problem Executing Command")
-                                success = True
-                            position += 1
-                        if len(fails) > 0:
-                            errors[str(len(errors))] = "0x009"
-                        response = {"mode": "sync", "conn-stat": 1, "type": "u-response", "signature": SIGNATURE,
-                                    "table": fails, "version": 0, "key": "", "data": "ACK", "uid": 0,
-                                    "errors": len(errors), "error-codes": errors}
-                        response = json.dumps(response)
-                        print("Responding with {0} ...".format(response))
-                        blink_tx()
-                        connection.sendall(response)
-                        if 0 == payload['conn-stat']:
-                            print("Synchronization Complete.")
-                            print("Closing connection with {0}:{1}".format(ip, port))
-                            sys.exit()
-                        if 1 == payload['conn-stat']:
-                            print("Continuing Connection")
-                            used = True
-                            continue
-                        else:
-                            print("Improper Connection Status")
-                            print("Closing connection with {0}:{1}".format(ip, port))
-                            sys.exit()
-                    elif "calibrate" in payload['type']:
-                        print("Calibrating...")
-                        tables = payload['data']
-                        success = True
-                        fails = []
-                        position = 0
-                        errors = {}
-                        for table in tables:
-                            if "1" not in ci_action("calibrateTable/" + table):
-                                success = False
-                            if success:
-                                print("Table: {0} calibrated successfully.".format(table))
-                            else:
-                                print("Table: {0} not successfully calibrated".format(table))
-                                fails.append(position)
-                                success = True
-                            position += 1
-                        if len(fails) > 0:
-                            errors[str(len(errors))] = "0x012"
-                        response = {"mode": "sync", "conn-stat": 1, "type": "c-response", "signature": SIGNATURE,
-                                    "table": fails, "version": 0, "errors": len(errors), "error-codes": errors,
-                                    "key": "", "uid": payload['uid']}
-                        response = json.dumps(response)
-                        print("Responding with {0} ...".format(response))
-                        blink_tx()
-                        connection.sendall(response)
-                        if 0 == payload['conn-stat']:
-                            print("Synchronization Complete.")
-                            print("Closing connection with {0}:{1}".format(ip, port))
-                            sys.exit()
-                        if 1 == payload['conn-stat']:
-                            print("Continuing Connection")
-                            used = True
-                            continue
-                        else:
-                            print("Improper Connection Status")
-                            print("Closing connection with {0}:{1}".format(ip, port))
-                            sys.exit()
-                    elif "download-preferences" in payload['type']:
-                        preferences = ci_action("getPreferences")
-                        response = {"mode": "sync", "type": "dp-response", "conn-stat": 0, "signature": SIGNATURE,
-                                    "table": json.loads(preferences), "errors": 0, "error-codes": [], "key": "",
-                                    "uid": payload['uid']}
-                        response = json.dumps(response)
-                        print("Responding with {0} ...".format(response))
-                        blink_tx()
-                        connection.sendall(response)
-                        if 0 == payload['conn-stat']:
-                            print("Synchronization Complete.")
-                            print("Closing connection with {0}:{1}".format(ip, port))
-                            sys.exit()
-                        if 1 == payload['conn-stat']:
-                            print("Continuing Connection")
-                            used = True
-                            continue
-                        else:
-                            print("Improper Connection Status")
-                            print("Closing connection with {0}:{1}".format(ip, port))
-                            sys.exit()
+                    connection.sendall(sync_a_process(payload))     #  Process Sync A Protocol
+                    if 0 == payload['conn-stat']:
+                        print("Closing connection with {0}:{1}".format(ip, port))
+                        sys.exit()
+                    if 1 == payload['conn-stat']:
+                        print("Continuing Connection")
+                        used = True
+                        continue
+                    else:
+                        print("Improper Connection Status")
+                        print("Closing connection with {0}:{1}".format(ip, port))
+                        sys.exit()
                 else:
                     print ("Error 0x010: Security ID Mismatch")
                     errors = {"0": "0x010"}
