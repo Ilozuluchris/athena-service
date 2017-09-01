@@ -517,26 +517,15 @@ def client_thread(connection, ip, port):
         if "ping" in payload['mode'] and "PING Athena" in payload['message']:  # Ping/Discovery Protocol
             blink_rx()
             print("Was just pinged, Responding Back...")
-            # TODO: Respond back through the same socket.
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            except socket.error, message:
-                print "Failed to create socket.Error code: " + str(message[0]) + ', Error message : ' + message[1]
-                sys.exit()
-            sock.connect((payload['source'], 8953))
-            try:
-                response = {'mode': "ping", 'source': payload['destination'],
-                            'message': "I'm codeName Athena!", "destination": payload['source']}
-                response = json.dumps(response)
-                print("Responding with {0}.".format(response))
-                blink_tx()
-                sock.sendall(json.dumps(response))
-                sock.close()
-                print("Closing connection with {0}:{1}".format(ip, 8953))
-                sys.exit()
-            except socket.error:
-                print 'Send failed'
-                sys.exit()
+            response = {'mode': "ping", 'source': payload['destination'], 'message': "I'm codeName Athena!",
+                        "destination": payload['source']}
+            response = json.dumps(response)
+            print("Responding with {0}.".format(response))
+            blink_tx()
+            connection.sendall(json.dumps(response))
+            connection.close()
+            print("Closing connection with {0}:{1}".format(ip, port))
+            sys.exit()
         if "iModeA" in payload['mode']:  # iModeA Protocol
             blink_rx()
             print("set to initialise android app.")
