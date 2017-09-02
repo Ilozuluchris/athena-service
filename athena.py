@@ -125,47 +125,42 @@ def stop_service():
 def sync_a_process(payload):  # Processes SyncA Mode Protocol
     print ("Processing SyncA Packet...")
     if "download" in payload['type']:
-        print("Sending Data...")
+        print("Getting Table and Sorting Versions...")
+        tables = payload['data']
+        versions = payload['versions']
+        return_versions = []
+        data = []  # Return data array.
         errors = {}
-        version = int(ci_action("getVersion/" + payload['table']))
-        if version > payload['version']:
-            table_data = ci_action("getTable/" + payload['table'])
-            if "[]" in table_data:
-                is_empty = 1
-            else:
-                is_empty = 0
-            response = {"mode": "sync", "type": "d-response",
-                        "signature": SIGNATURE,
-                        "conn-stat": 1,
-                        "data": json.loads(table_data),
-                        "is_empty": is_empty,
-                        "should_wipe": 1,
-                        "version": version, "errors": len(errors), "error-codes": errors}
-            print("Flagging that table has been downloaded by user.")
-            if "1" not in (ci_action("flagTaken/" + payload['table'] + "/1")):
-                errors[str(len(errors))] = "0x011"
-            response = json.dumps(response)
-            print("Responding with {0}".format(response))
-            blink_tx()
-            return response
-        else:
-            print(version)
-            print(payload['version'])
-            if version == -1:
-                errors[str(len(errors))] = "0x008"
-            elif version < payload['version']:
-                errors[str(len(errors))] = "0x007"
-            response = {"mode": "sync", "type": "d-response",
-                        "signature": SIGNATURE,
-                        "data": {},
-                        "is_empty": 1,
-                        "should_wipe": 0,
-                        "version": version, "errors": len(errors), "error-codes": errors,
-                        "conn-stat": 1, "key": "", "uid": payload['uid']}
-            response = json.dumps(response)
-            print("Responding with {0}".format(response))
-            blink_tx()
-            return response
+        flag_error = False
+        for table in tables:
+            for version in versions:
+                server_version = int(ci_action("getVersion/" + table))
+                if server_version > version:  # Server version of table is more recent than client version
+                    contents = json.loads(ci_action("getTable/" + table))
+                    data.append(contents)  # Append table contents to the return data array
+                    return_versions.append(server_version)  # Append corresponding server version
+                    print("Flagging that table has been downloaded by user.")
+                    if "1" not in (ci_action("flagTaken/" + payload['table'] + "/1")):
+                        if not flag_error:
+                            errors[str(len(errors))] = "0x011"
+                            # TODO: Log a Flag Error Here.
+                            flag_error = True
+                else:
+                    data.append([])  # No need to return content for given table as version numbers are likely equal or wrong.
+                    if server_version == -1:
+                        errors[str(len(errors))] = "0x008"
+                        return_versions.append(-1)  # Due to presence of error.
+                    elif server_version < version:
+                        errors[str(len(errors))] = "0x007"
+                        return_versions.append(-1)  # Due to presence of error.
+                    else:
+                        return_versions.append(version)
+        response = {"mode": "syncA", "type": "d-response", "signature": SIGNATURE, "conn-stat": payload['conn-stat'],
+                    "data": data, "versions": return_versions, "errors": len(errors), "error-codes": errors}
+        response = json.dumps(response)
+        print("Responding with {0}".format(response))
+        blink_tx()
+        return response
     elif "calibrate" in payload['type']:
         print("Calibrating...")
         tables = payload['data']
@@ -654,7 +649,7 @@ def client_thread(connection, ip, port):
                     if "syncA" in payload['mode']:
                         blink_rx()
                         print ("SyncA Mode Started...")
-                        connection.sendall(sync_a_process(payload))  # Process Sync A Protocol.
+                        connection.sendall(sync_a_process(payload))  # Process SyncA Protocol.
                     elif "passport" in payload['mode']:
                         passport_process(payload, connection, ip, port)  # Process Passport Protocol.
                     if 0 == payload['conn-stat']:
